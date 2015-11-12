@@ -4,8 +4,10 @@
 //
 
 using System;
+using System.Linq;
 using System.Web;
 using System.Web.SessionState;
+using log4net;
 
 namespace Microsoft.Web.Redis
 {
@@ -23,6 +25,7 @@ namespace Microsoft.Web.Redis
         internal ICacheConnection cache;
 
         private static object _lastException = new object();
+        static readonly ILog _log = LogManager.GetLogger("RedisSessionStateProvider");
 
         /// <summary>
         /// We do not want to throw exception from session state provider because this will break customer application and they can't get chance to handel it.
@@ -129,7 +132,7 @@ namespace Microsoft.Web.Redis
                 {
                     GetAccessToStore(sessionId);
                     cache.TryReleaseLockIfLockIdMatch(sessionLockId, sessionTimeoutInSeconds);
-                    LogUtility.LogInfo("EndRequest => Session Id: {0}, Session provider object: {1} => Lock Released with lockId {2}.", sessionId, this.GetHashCode(), sessionLockId);
+                    _log.InfoFormat("EndRequest => Session Id: {0}, Session provider object: {1} => Lock Released with lockId {2}.", sessionId, this.GetHashCode(), sessionLockId);
                     sessionId = null;
                     sessionLockId = null;
                 }
@@ -137,7 +140,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("EndRequest => {0}", e.ToString());
+                _log.ErrorFormat("EndRequest => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {
@@ -149,7 +152,7 @@ namespace Microsoft.Web.Redis
         public override SessionStateStoreData CreateNewStoreData(HttpContext context, int timeout)
         {
             //Creating empty session store data and return it. 
-            LogUtility.LogInfo("CreateNewStoreData => Session provider object: {0}.", this.GetHashCode());
+            _log.InfoFormat("CreateNewStoreData => Session provider object: {0}.", this.GetHashCode());
             return new SessionStateStoreData(new ChangeTrackingSessionStateItemCollection(), new HttpStaticObjectsCollection(), timeout);
         }
         
@@ -159,7 +162,7 @@ namespace Microsoft.Web.Redis
             {
                 if (LastException == null)
                 {
-                    LogUtility.LogInfo("CreateUninitializedItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
+                    _log.InfoFormat("CreateUninitializedItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
                     ISessionStateItemCollection sessionData = new ChangeTrackingSessionStateItemCollection();
                     sessionData["SessionStateActions"] = SessionStateActions.InitializeItem;
                     GetAccessToStore(id);
@@ -169,7 +172,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("CreateUninitializedItem => {0}", e.ToString());
+                _log.ErrorFormat("CreateUninitializedItem => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {
@@ -180,13 +183,13 @@ namespace Microsoft.Web.Redis
         
         public override SessionStateStoreData GetItem(HttpContext context, string id, out bool locked, out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
         {
-            LogUtility.LogInfo("GetItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
+            _log.InfoFormat("GetItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
             return GetItemFromSessionStore(false, context, id, out locked, out lockAge, out lockId, out actions);
         }
 
         public override SessionStateStoreData GetItemExclusive(HttpContext context, string id, out bool locked, out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
         {
-            LogUtility.LogInfo("GetItemExclusive => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
+            _log.InfoFormat("GetItemExclusive => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
             return GetItemFromSessionStore(true, context, id, out locked, out lockAge, out lockId, out actions);
         }
 
@@ -219,14 +222,14 @@ namespace Microsoft.Web.Redis
                 if (isLockTaken)
                 {
                     locked = false;
-                    LogUtility.LogInfo("GetItemFromSessionStore => Session Id: {0}, Session provider object: {1} => Lock taken with lockId: {2}", id, this.GetHashCode(), lockId);
+                    _log.InfoFormat("GetItemFromSessionStore => Session Id: {0}, Session provider object: {1} => Lock taken with lockId: {2}", id, this.GetHashCode(), lockId);
                 }
                 else
                 {
                     sessionId = null;
                     sessionLockId = null;
                     locked = true;
-                    LogUtility.LogInfo("GetItemFromSessionStore => Session Id: {0}, Session provider object: {1} => Can not lock, Someone else has lock and lockId is {2}", id, this.GetHashCode(), lockId);
+                    _log.InfoFormat("GetItemFromSessionStore => Session Id: {0}, Session provider object: {1} => Can not lock, Someone else has lock and lockId is {2}", id, this.GetHashCode(), lockId);
                 }
 
                 // If locking is not successful then do not return any result just return lockAge, locked=true and lockId.
@@ -259,7 +262,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("GetItemFromSessionStore => {0}", e.ToString());
+                _log.ErrorFormat("GetItemFromSessionStore => {0}", e.ToString());
                 locked = false;
                 lockId = null;
                 lockAge = TimeSpan.Zero;
@@ -279,7 +282,7 @@ namespace Microsoft.Web.Redis
             {
                 if (LastException == null)
                 {
-                    LogUtility.LogInfo("ResetItemTimeout => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
+                    _log.InfoFormat("ResetItemTimeout => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
                     GetAccessToStore(id);
                     cache.UpdateExpiryTime((int)configuration.SessionTimeout.TotalSeconds);
                     cache = null;
@@ -287,7 +290,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("ResetItemTimeout => {0}", e.ToString());
+                _log.ErrorFormat("ResetItemTimeout => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {
@@ -302,14 +305,14 @@ namespace Microsoft.Web.Redis
             {
                 if (LastException == null && lockId != null)
                 {
-                    LogUtility.LogInfo("RemoveItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
+                    _log.InfoFormat("RemoveItem => Session Id: {0}, Session provider object: {1}.", id, this.GetHashCode());
                     GetAccessToStore(id);
                     cache.TryRemoveAndReleaseLockIfLockIdMatch(lockId);
                 }
             }
             catch (Exception e)
             {
-                LogUtility.LogError("RemoveItem => {0}", e.ToString());
+                _log.ErrorFormat("RemoveItem => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {
@@ -335,7 +338,7 @@ namespace Microsoft.Web.Redis
 
                 if (LastException == null && lockId != null)
                 {
-                    LogUtility.LogInfo("ReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => For lockId: {2}.", id, this.GetHashCode(), lockId);
+                    _log.InfoFormat("ReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => For lockId: {2}.", id, this.GetHashCode(), lockId);
                     GetAccessToStore(id);
                     cache.TryReleaseLockIfLockIdMatch(lockId, sessionTimeoutInSeconds);
                     // Either already released lock successfully inside above if block
@@ -346,7 +349,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("ReleaseItemExclusive => {0}", e.ToString());
+                _log.ErrorFormat("ReleaseItemExclusive => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {
@@ -382,7 +385,7 @@ namespace Microsoft.Web.Redis
 
                         // Converting timout from min to sec
                         cache.Set(sessionItems, (item.Timeout * FROM_MIN_TO_SEC));
-                        LogUtility.LogInfo("SetAndReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => created new item in session.", id, this.GetHashCode());
+                        _log.InfoFormat("SetAndReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => created new item in session.", id, this.GetHashCode());
                     } // If update if lock matches
                     else
                     {
@@ -394,14 +397,14 @@ namespace Microsoft.Web.Redis
                             }
                             // Converting timout from min to sec
                             cache.TryUpdateAndReleaseLockIfLockIdMatch(lockId, item.Items, (item.Timeout * FROM_MIN_TO_SEC));
-                            LogUtility.LogInfo("SetAndReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => updated item in session.", id, this.GetHashCode());
+                            _log.InfoFormat("SetAndReleaseItemExclusive => Session Id: {0}, Session provider object: {1} => updated item in session.", id, this.GetHashCode());
                         }
                     }
                 }
             }
             catch (Exception e)
             {
-                LogUtility.LogError("SetAndReleaseItemExclusive => {0}", e.ToString());
+                _log.ErrorFormat("SetAndReleaseItemExclusive => {0}", e.ToString());
                 LastException = e;
                 if (configuration.ThrowOnError)
                 {

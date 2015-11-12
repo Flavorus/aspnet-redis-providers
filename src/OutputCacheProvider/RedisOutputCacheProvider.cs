@@ -5,6 +5,8 @@
 
 using System;
 using System.Web.Caching;
+using log4net;
+using log4net.Util;
 
 namespace Microsoft.Web.Redis
 {
@@ -13,7 +15,7 @@ namespace Microsoft.Web.Redis
         internal static ProviderConfiguration configuration;
         internal static object configurationCreationLock = new object();
         internal IOutputCacheConnection cache;
-        
+        static readonly ILog _log = LogManager.GetLogger("RedisSessionStateProvider");
         public override void Initialize(string name, System.Collections.Specialized.NameValueCollection config)
         {
             if (config == null)
@@ -55,7 +57,7 @@ namespace Microsoft.Web.Redis
             }
             catch(Exception e)
             {
-                LogUtility.LogError("Error in Get: " + e.Message);
+                _log.Error("Error in Get: " + e.Message);
             }
             return null;
         }
@@ -69,7 +71,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("Error in Add: " + e.Message);
+                _log.Error("Error in Add: " + e.Message);
             }
             return null;
         }
@@ -83,7 +85,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("Error in Set: " + e.Message);
+                _log.Error("Error in Set: " + e.Message);
             }
         }
 
@@ -96,7 +98,7 @@ namespace Microsoft.Web.Redis
             }
             catch (Exception e)
             {
-                LogUtility.LogError("Error in Remove: " + e.Message);
+                _log.Error("Error in Remove: " + e.Message);
             }
         }
         
